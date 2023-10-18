@@ -42,12 +42,6 @@ namespace JsonDb
         Modified    = (1 << 2)
     }
 
-    internal class JsonDatabaseModification
-    {
-        [JsonProperty("sid")] public string SessionId { get; set; }
-        [JsonProperty("mf")] public ModificationFlags Modification { get; set; }
-    }
-
     internal class JsonDatabaseTable
     {
         [JsonProperty("n")] public string Name { get; set; }
@@ -60,7 +54,6 @@ namespace JsonDb
         [JsonProperty("n")] public string Name { get; set; }
         [JsonProperty("ca")] public DateTime CreatedAt { get; set; }
         [JsonProperty("lua")] public DateTime LastUpdatedAt { get; set; }
-        [JsonProperty("mh")] public List<JsonDatabaseModification> ModificationHistory { get; set; }
         [JsonProperty("t")] public List<JsonDatabaseTable> Tables { get; set; }
     }
 }

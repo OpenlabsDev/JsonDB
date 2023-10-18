@@ -66,12 +66,6 @@ namespace JsonDb
         {
             try
             {
-                _db.ModificationHistory.Add(new JsonDatabaseModification
-                {
-                    SessionId = _session,
-                    Modification = GetFlagFromModificationType(query.type)
-                });
-
                 var table = _db.Tables.Find(x => x.Name == query.table);
                 var tableIdx = _db.Tables.IndexOf(table);
 

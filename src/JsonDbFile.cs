@@ -45,7 +45,6 @@ namespace JsonDb
                     Name = Name,
                     CreatedAt = DateTime.Now,
                     LastUpdatedAt = DateTime.Now,
-                    ModificationHistory = new List<JsonDatabaseModification>(),
                     Tables = new List<JsonDatabaseTable>()
                 });
             }
