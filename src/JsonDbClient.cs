@@ -36,6 +36,29 @@ namespace JsonDb
         }
 
         /// <summary>
+        /// Creates a table if it doesnt exist.
+        /// </summary>
+        /// <param name="tableName">The name of the table.</param>
+        /// <param name="keys">The keys to include.</param>
+        /// <param name="rows">The data to initialize the table with.</param>
+        public bool InitTable(string tableName, List<string> keys, List<List<object>> rows)
+        {
+            if (!_db.Tables.Any(x => x.Name == tableName))
+            {
+                _db.Tables.Add(new JsonDatabaseTable
+                {
+                    Name = tableName,
+                    Keys = keys,
+                    Rows = rows
+                });
+
+                _file.SaveDb(_db);
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
         /// Executes a modification query, and then saves the file.
         /// </summary>
         /// <param name="query">The query to execute.</param>
@@ -120,7 +143,11 @@ namespace JsonDb
 
                 return true;
             }
-            catch { return false; }
+            catch (Exception ex) 
+            {
+                Console.WriteLine(ex.ToString());
+                return false;
+            }
             finally
             {
                 _file.SaveDb(_db);

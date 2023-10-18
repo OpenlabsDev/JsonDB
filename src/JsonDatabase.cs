@@ -10,16 +10,28 @@ namespace JsonDb
 {
     public enum ModificationQueryType
     {
-        Create      = (1 << 0),
-        Delete      = (1 << 1),
-        Insert      = (1 << 2),
-        Change      = (1 << 3),
+        /// <summary>
+        /// Deletes the whole data set.
+        /// </summary>
+        Delete      = (1 << 0),
+
+        /// <summary>
+        /// Inserts the data into a row.
+        /// </summary>
+        Insert      = (1 << 1),
+
+        /// <summary>
+        /// Changes a row.
+        /// </summary>
+        Change      = (1 << 2),
     }
 
     public class ModificationQuery
     {
         public string table;
         public ModificationQueryType type;
+        public List<string> keys;
+        public FindDataPredicate predicate;
         public List<object> data;
     }
 
@@ -39,8 +51,8 @@ namespace JsonDb
     internal class JsonDatabaseTable
     {
         [JsonProperty("n")] public string Name { get; set; }
-        [JsonProperty("r")] public List<string> Rows { get; set; }
-        [JsonProperty("c")] public List<List<object>> Columns { get; set; }
+        [JsonProperty("k")] public List<string> Keys { get; set; }
+        [JsonProperty("r")] public List<List<object>> Rows { get; set; }
     }
 
     internal class JsonDatabase

@@ -3,7 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.6.33829.357
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JsonDb", "src\JsonDb.csproj", "{6D1AC4A4-879B-40D5-8936-D5C4C5AAFA04}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "JsonDb", "src\JsonDb.csproj", "{6D1AC4A4-879B-40D5-8936-D5C4C5AAFA04}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JsonDb.Tests", "JsonDb.Tests\JsonDb.Tests.csproj", "{65EA8C16-AFE4-4F22-AF32-86A28E6751FA}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +17,10 @@ Global
 		{6D1AC4A4-879B-40D5-8936-D5C4C5AAFA04}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6D1AC4A4-879B-40D5-8936-D5C4C5AAFA04}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6D1AC4A4-879B-40D5-8936-D5C4C5AAFA04}.Release|Any CPU.Build.0 = Release|Any CPU
+		{65EA8C16-AFE4-4F22-AF32-86A28E6751FA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{65EA8C16-AFE4-4F22-AF32-86A28E6751FA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{65EA8C16-AFE4-4F22-AF32-86A28E6751FA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{65EA8C16-AFE4-4F22-AF32-86A28E6751FA}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

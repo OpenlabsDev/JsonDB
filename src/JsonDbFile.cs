@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 using Tiny;
 
 namespace JsonDb
@@ -12,6 +13,8 @@ namespace JsonDb
     /// </summary>
     public class JsonDbFile : IDbFile
     {
+        public string Name { get; }
+
         /// <inheritdoc/>
         public string Path { get; }
 
@@ -24,8 +27,9 @@ namespace JsonDb
         /// Creates a new instance of <see cref="JsonDbFile"/>
         /// </summary>
         /// <param name="path">The path to the json database file.</param>
-        public JsonDbFile(string path)
+        public JsonDbFile(string name, string path)
         {
+            Name = name;
             Path = path;
         }
 
@@ -35,7 +39,16 @@ namespace JsonDb
             Open = true;
 
             if (!File.Exists(Path))
-                throw new Exception("The file does not exist.");
+            {
+                SaveDb(new JsonDatabase
+                {
+                    Name = Name,
+                    CreatedAt = DateTime.Now,
+                    LastUpdatedAt = DateTime.Now,
+                    ModificationHistory = new List<JsonDatabaseModification>(),
+                    Tables = new List<JsonDatabaseTable>()
+                });
+            }
 
             var contents = Encoding.UTF8.GetString(
                 Convert.FromBase64String(File.ReadAllText(Path))
