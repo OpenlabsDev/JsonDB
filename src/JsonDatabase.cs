@@ -44,6 +44,22 @@ namespace JsonDb
 
     internal class JsonDatabaseTable
     {
+        public JsonDatabaseTable() { }
+
+        public JsonDatabaseTable(JsonDatabaseTable t)
+        {
+            Name = t.Name;
+            Keys = t.Keys;
+            Rows = t.Rows;
+        }
+
+        public JsonDatabaseTable(string name, List<string> keys, List<List<object>> rows)
+        {
+            Name = name;
+            Keys = keys;
+            Rows = rows;
+        }
+
         [JsonProperty("n")] public string Name { get; set; }
         [JsonProperty("k")] public List<string> Keys { get; set; }
         [JsonProperty("r")] public List<List<object>> Rows { get; set; }
@@ -51,6 +67,24 @@ namespace JsonDb
 
     internal class JsonDatabase
     {
+        public JsonDatabase() { }
+
+        public JsonDatabase(JsonDatabase d)
+        {
+            Name = d.Name;
+            CreatedAt = d.CreatedAt;
+            LastUpdatedAt = d.LastUpdatedAt;
+            Tables = d.Tables;
+        }
+
+        public JsonDatabase(string name, DateTime createdAt, DateTime lastUpdatedAt, List<JsonDatabaseTable> tables)
+        {
+            Name = name;
+            CreatedAt = createdAt;
+            LastUpdatedAt = lastUpdatedAt;
+            Tables = tables;
+        }
+
         [JsonProperty("n")] public string Name { get; set; }
         [JsonProperty("ca")] public DateTime CreatedAt { get; set; }
         [JsonProperty("lua")] public DateTime LastUpdatedAt { get; set; }

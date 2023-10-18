@@ -40,7 +40,7 @@ namespace JsonDb
 
             if (!File.Exists(Path))
             {
-                SaveDb(new JsonDatabase
+                SaveDb(new JsonDatabase()
                 {
                     Name = Name,
                     CreatedAt = DateTime.Now,

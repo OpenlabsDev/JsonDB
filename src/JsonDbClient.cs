@@ -2,11 +2,16 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Channels;
 using System.Threading.Tasks;
-using static System.Collections.Specialized.BitVector32;
+using Tiny;
 
 namespace JsonDb
 {
+    /// <summary>
+    /// A predicate used to find data in rows.
+    /// </summary>
+    /// <param name="values">The row of the data.</param>
     public delegate bool FindDataPredicate(List<object> values);
 
     /// <summary>
@@ -86,14 +91,28 @@ namespace JsonDb
                     List<int> indexes = new List<int>();
                     foreach (var key in table.Keys)
                         if (query.keys.Contains(key))
-                            indexes.Add(table.Keys.IndexOf(key));
+                        {
+                            var idx = table.Keys.IndexOf(key);
+#if LOG_MESSAGES
+                            Console.WriteLine("INFO: adding " + key + "; idx = " + idx);
+#endif
+                            indexes.Add(idx);
+                        }
 
                     int rowToDelete = -1;
-                    for (int y = 0; y < table.Rows.Count; y++)
-                        for (int x = 0; x < table.Keys.Count; x++)
+                    for (int x = 0; x < table.Keys.Count; x++)
+                        for (int y = 0; y < table.Rows.Count; y++)
                         {
+#if LOG_MESSAGES
+                            Console.WriteLine("INFO: running predicate for  " + Json.Encode(table.Rows[y]));
+#endif
                             if (indexes.Contains(x) && query.predicate(table.Rows[y]))
+                            {
+#if LOG_MESSAGES
+                                Console.WriteLine("INFO: deleting row " + y);
+#endif
                                 rowToDelete = y;
+                            }
                         }
                     table.Rows.RemoveAt(rowToDelete);
 
@@ -102,11 +121,20 @@ namespace JsonDb
                 }
                 else if (query.type == ModificationQueryType.Change)
                 {
-                    List<int> indexes = new List<int>();
+                    List<(int keyIdx, int pendingChangeIdx)> indexes = new();
                     foreach (var key in table.Keys)
                         if (query.keys.Contains(key))
-                            indexes.Add(table.Keys.IndexOf(key));
+                        {
+                            var keyIdx = table.Keys.IndexOf(key);
+                            var pendingChangeIdx = query.keys.IndexOf(key);
 
+#if LOG_MESSAGES
+                            Console.WriteLine("INFO: adding " + key + "; keyIdx = " + keyIdx + "; pendingChangeIdx = " + pendingChangeIdx);
+#endif
+                            indexes.Add((keyIdx, pendingChangeIdx));
+                        }
+
+                    List<Tuple<int, int, object>> pendingChanges = new();
                     //
                     // named x and y because rows and columns are in a vector format
                     //
@@ -122,14 +150,34 @@ namespace JsonDb
                     // =  3   = Test = Test = None =  3
                     // =------=------=------=------=
                     //
-                    for (int y = 0; y < table.Rows.Count; y++)
-                        for (int x = 0; x < table.Keys.Count; x++)
+                    for (int x = 0; x < table.Keys.Count; x++)
+                        for (int y = 0; y < table.Rows.Count; y++)
                         {
-                            if (indexes.Contains(x) && query.predicate(table.Rows[y]))
+#if LOG_MESSAGES
+                            Console.WriteLine("INFO: running predicate for  " + Json.Encode(table.Rows[y]));
+#endif
+                            if (indexes.Any(o => o.keyIdx == x) && query.predicate(table.Rows[y]))
                             {
-                                table.Rows[y][x] = query.data[x];
+                                var idxInfo = indexes.Find(o => o.keyIdx == x);
+
+#if LOG_MESSAGES
+                                Console.WriteLine("INFO: pred passed; query.data.Count = " + query.data.Count + "; idxInfo.pendingChangeIdx = " + idxInfo.pendingChangeIdx);
+#endif
+                                pendingChanges.Add(new Tuple<int, int, object>(x, y, query.data[idxInfo.pendingChangeIdx]));
                             }
                         }
+
+#if LOG_MESSAGES
+                    Console.WriteLine("INFO: finished initial table evaluation");
+#endif
+
+                    foreach (var change in pendingChanges)
+                    {
+#if LOG_MESSAGES
+                        Console.WriteLine("INFO: changing " + Json.Encode(table.Rows[change.Item2][change.Item1]) + " --> " + Json.Encode(change.Item3));
+#endif
+                        table.Rows[change.Item2][change.Item1] = change.Item3;
+                    }
 
                     _db.Tables[tableIdx] = table;
                     _file.SaveDb(_db);

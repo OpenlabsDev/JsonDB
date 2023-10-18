@@ -1,4 +1,5 @@
-﻿using System.Net.NetworkInformation;
+﻿using System.Net.Http.Headers;
+using System.Net.NetworkInformation;
 
 namespace JsonDb.Tests
 {
@@ -25,19 +26,23 @@ namespace JsonDb.Tests
             bool success = DbClient.ModifyQuery(new ModificationQuery
             {
                 table = "test",
-                type = ModificationQueryType.Insert,
+                type = ModificationQueryType.Change,
+                keys = new List<string>
+                {
+                    "id", "desc"
+                },
+                predicate = (x) => int.Parse(x[0].ToString()) == 0,
                 data = new List<object>
                 {
-                    1, "Joe", "Hes cool i guess"
+                    1, "Hes cool i guess"
                 }
             });
 
             if (!success)
-            {
                 Console.Write("Error: Failed to modify table");
-            }
 
             DbClient.Close();
+            Console.ReadLine();
         }
     }
 }
