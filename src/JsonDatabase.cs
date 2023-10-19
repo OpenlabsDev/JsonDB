@@ -46,14 +46,15 @@ namespace JsonDb
     {
         public JsonDatabaseTable() { }
 
-        public JsonDatabaseTable(JsonDatabaseTable t)
+        // clones an instance of JsonDatabaseTable
+        public JsonDatabaseTable(JsonDatabaseTable t) : this()
         {
             Name = t.Name;
             Keys = t.Keys;
             Rows = t.Rows;
         }
 
-        public JsonDatabaseTable(string name, List<string> keys, List<List<object>> rows)
+        public JsonDatabaseTable(string name, List<string> keys, List<List<object>> rows) : this()
         {
             Name = name;
             Keys = keys;
@@ -69,7 +70,8 @@ namespace JsonDb
     {
         public JsonDatabase() { }
 
-        public JsonDatabase(JsonDatabase d)
+        // clones an instance of JsonDatabase
+        public JsonDatabase(JsonDatabase d) : this()
         {
             Name = d.Name;
             CreatedAt = d.CreatedAt;
@@ -77,7 +79,7 @@ namespace JsonDb
             Tables = d.Tables;
         }
 
-        public JsonDatabase(string name, DateTime createdAt, DateTime lastUpdatedAt, List<JsonDatabaseTable> tables)
+        public JsonDatabase(string name, DateTime createdAt, DateTime lastUpdatedAt, List<JsonDatabaseTable> tables) : this()
         {
             Name = name;
             CreatedAt = createdAt;

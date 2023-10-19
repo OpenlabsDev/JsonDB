@@ -5,43 +5,94 @@ namespace JsonDb.Tests
 {
     internal class Program
     {
-        static JsonDbFile DbFile = new JsonDbFile("Production", Environment.CurrentDirectory + "\\prod.jsondb");
-        static JsonDbClient DbClient = new JsonDbClient();
+        static JsonDbFile DbFile = new JsonDbFile("Testing Database", Environment.CurrentDirectory + "\\test.jsondb");
+        static JsonDbClient DbClient = new JsonDbClient(DbFile);
 
         static void Main(string[] args)
         {
-            DbClient.Open(DbFile);
-
-            DbClient.InitTable("test", new List<string>
+            var session = DbClient.Open("customSessionId");
+            session.InitTable(new InitTableArgs("jdb.test", new List<string>
             {
-                "id", "name", "desc"
+                "guid"
             }, new List<List<object>>
             {
                 new List<object>
                 {
-                    0, "Test", "None"
-                }
-            });
-
-            bool success = DbClient.ModifyQuery(new ModificationQuery
-            {
-                table = "test",
-                type = ModificationQueryType.Change,
-                keys = new List<string>
-                {
-                    "id", "desc"
+                    Guid.NewGuid().ToString(),
                 },
-                predicate = (x) => int.Parse(x[0].ToString()) == 0,
-                data = new List<object>
+                new List<object>
                 {
-                    1, "Hes cool i guess"
+                    Guid.NewGuid().ToString(),
+                },
+                new List<object>
+                {
+                    Guid.NewGuid().ToString(),
+                },
+                new List<object>
+                {
+                    Guid.NewGuid().ToString(),
+                }
+            })
+            {
+                OnSuccess = () =>
+                {
+                    Console.WriteLine("Successfully initialized table");
+                },
+                OnError = (err) =>
+                {
+                    Console.Error.WriteLine("Failed to init table: " + err);
                 }
             });
 
-            if (!success)
-                Console.Write("Error: Failed to modify table");
+            DbClient.InitTable(new InitTableArgs("jdb.test2", new List<string>
+            {
+                "key1", "key2", "key3"
+            }, new List<List<object>>
+            {
+                new List<object>
+                {
+                    Random.Shared.Next(1000, 19999999),
+                    Random.Shared.Next(1000, 19999999),
+                    Random.Shared.Next(1000, 19999999)
+                },
+                new List<object>
+                {
+                    Random.Shared.Next(1000, 19999999),
+                    Random.Shared.Next(1000, 19999999),
+                    Random.Shared.Next(1000, 19999999)
+                },
+                new List<object>
+                {
+                    Random.Shared.Next(1000, 19999999),
+                    Random.Shared.Next(1000, 19999999),
+                    Random.Shared.Next(1000, 19999999)
+                },
+                new List<object>
+                {
+                    Random.Shared.Next(1000, 19999999),
+                    Random.Shared.Next(1000, 19999999),
+                    Random.Shared.Next(1000, 19999999)
+                },
+                new List<object>
+                {
+                    Random.Shared.Next(1000, 19999999),
+                    Random.Shared.Next(1000, 19999999),
+                    Random.Shared.Next(1000, 19999999)
+                },
+                new List<object>
+                {
+                    Random.Shared.Next(1000, 19999999),
+                    Random.Shared.Next(1000, 19999999),
+                    Random.Shared.Next(1000, 19999999)
+                }
+            }), () =>
+            {
+                Console.WriteLine("Successfully initialized table sync");
+            }, err =>
+            {
+                Console.Error.WriteLine("Failed to init table sync: " + err);
+            });
 
-            DbClient.Close();
             Console.ReadLine();
         }
     }
