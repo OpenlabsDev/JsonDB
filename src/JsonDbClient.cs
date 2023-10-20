@@ -1,4 +1,6 @@
-﻿using JsonDb.Interfaces;
+﻿#define LOG_MESSAGES
+
+using JsonDb.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -113,11 +115,18 @@ namespace JsonDb
                         Rows = args.Rows
                     });
 
+#if LOG_MESSAGES
+                    Console.WriteLine("INFO: adding " + args.TableName + " table to db");
+#endif
                     _client.File.SaveDb(_client.Database);
                     args.OnSuccess();
                     return true;
                 }
 
+
+#if LOG_MESSAGES
+                Console.WriteLine("WARNING: table " + args.TableName + " already exists in db");
+#endif
                 args.OnError("Table already exists");
                 return false;
             }
@@ -229,7 +238,7 @@ namespace JsonDb
                                 var idxInfo = indexes.Find(o => o.keyIdx == x);
 
 #if LOG_MESSAGES
-                                Console.WriteLine("INFO: pred passed; query.data.Count = " + query.data.Count + "; idxInfo.pendingChangeIdx = " + idxInfo.pendingChangeIdx);
+                                Console.WriteLine("INFO: pred passed; query.data.Count = " + args.Query.data.Count + "; idxInfo.pendingChangeIdx = " + idxInfo.pendingChangeIdx);
 #endif
                                 pendingChanges.Add(new Tuple<int, int, object>(x, y, args.Query.data[idxInfo.pendingChangeIdx]));
                             }
@@ -286,6 +295,10 @@ namespace JsonDb
         {
             data = new List<object>();
 
+
+#if LOG_MESSAGES
+            Console.WriteLine("INFO: getting data from the " + args.TableName + " table");
+#endif
             foreach (var table in _client.Database.Tables)
             {
                 List<int> indexes = new List<int>();
@@ -304,6 +317,10 @@ namespace JsonDb
                         }
                     }
             }
+
+#if LOG_MESSAGES
+            Console.WriteLine("INFO: finished get operation in the " + args.TableName + " table");
+#endif
             return true;
         }
 
@@ -334,9 +351,9 @@ namespace JsonDb
 
             if (async)
             {
-                Task.Run(async () => await InitTable_QueueProcessor());
-                Task.Run(async () => await ModifyQuery_QueueProcessor());
-                Task.Run(async () => await GetQuery_QueueProcessor());
+                Task.Factory.StartNew(async () => await InitTable_QueueProcessor(), TaskCreationOptions.LongRunning);
+                Task.Factory.StartNew(async () => await ModifyQuery_QueueProcessor(), TaskCreationOptions.LongRunning);
+                Task.Factory.StartNew(async () => await GetQuery_QueueProcessor(), TaskCreationOptions.LongRunning);
             }
         }
 
@@ -366,11 +383,21 @@ namespace JsonDb
                                 Rows = args.Rows
                             });
 
+#if LOG_MESSAGES
+                            Console.WriteLine("INFO: adding " + args.TableName + " table to db");
+#endif
+
                             _file.SaveDb(_db);
                             args.OnSuccess();
                         }
                         else
+                        {
+#if LOG_MESSAGES
+                            Console.WriteLine("WARNING: table " + args.TableName + " already exists in db");
+#endif
+
                             args.OnError("Table already exists");
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -485,7 +512,7 @@ namespace JsonDb
                                         var idxInfo = indexes.Find(o => o.keyIdx == x);
 
 #if LOG_MESSAGES
-                                Console.WriteLine("INFO: pred passed; query.data.Count = " + query.data.Count + "; idxInfo.pendingChangeIdx = " + idxInfo.pendingChangeIdx);
+                                Console.WriteLine("INFO: pred passed; query.data.Count = " + args.Query.data.Count + "; idxInfo.pendingChangeIdx = " + idxInfo.pendingChangeIdx);
 #endif
                                         pendingChanges.Add(new Tuple<int, int, object>(x, y, args.Query.data[idxInfo.pendingChangeIdx]));
                                     }
@@ -532,31 +559,66 @@ namespace JsonDb
                 {
                     var args = _getQueryQueue.Dequeue();
 
+
+#if LOG_MESSAGES
+                    Console.WriteLine("INFO: getting data from the " + args.TableName + " table");
+#endif
                     try
                     {
+                        bool foundTable = false;
                         foreach (var table in _db.Tables)
                         {
+#if LOG_MESSAGES
+                            Console.WriteLine("INFO: found " + table.Name + " table");
+#endif
                             List<int> indexes = new List<int>();
                             foreach (var key in table.Keys)
                                 if (args.Keys.Contains(key))
+                                {
+                                    var keyIdx = table.Keys.IndexOf(key);
+#if LOG_MESSAGES
+                                    Console.WriteLine("WARNING: adding " + key + " to key list; keyIdx = " + keyIdx);
+#endif
                                     indexes.Add(table.Keys.IndexOf(key));
+                                }
 
                             if (table.Name == args.TableName)
+                            {
+#if LOG_MESSAGES
+                                Console.WriteLine("INFO: found " + table.Name + " table that was requested");
+#endif
                                 foreach (var row in table.Rows)
                                 {
+                                    var rowIdx = table.Rows.IndexOf(row);
                                     var requestedColumns = GetIncludedColumns(indexes, row);
                                     if (args.Predicate(requestedColumns))
                                     {
+#if LOG_MESSAGES
+                                        Console.WriteLine("INFO: predicate success. took " + rowIdx + " row(s) to find target");
+#endif
+                                        foundTable = true;
                                         args.OnSuccess(requestedColumns);
-                                        return;
+                                        break;
                                     }
                                 }
+                            }
                         }
 
-                        args.OnError("No table found, or the table data query predicate failed.");
+                        if (!foundTable)
+                        {
+#if LOG_MESSAGES
+                            Console.WriteLine("WARNING: table " + args.TableName + " was not found in db");
+#endif
+
+                            args.OnError("No table found, or the table data query predicate failed.");
+                        }
                     }
                     catch (Exception ex)
                     {
+#if LOG_MESSAGES
+                        Console.WriteLine("WARNING: " + ex.ToString());
+#endif
+
                         args.OnError(ex.Message);
                     }
                 }
@@ -632,9 +694,6 @@ namespace JsonDb
         /// <inheritdoc/>
         public void Close(JsonDbClientSession session) 
         {
-            _file = null;
-            _db = null;
-
             _allSessions.Remove(session);
         }
 

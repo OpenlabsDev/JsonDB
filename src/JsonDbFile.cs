@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
@@ -35,7 +36,7 @@ namespace JsonDb
 
         internal JsonDatabase OpenDb()
         {
-            if (Open) return null;
+            if (Open) return null!;
             Open = true;
 
             if (!File.Exists(Path))
