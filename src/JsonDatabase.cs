@@ -1,9 +1,9 @@
-﻿using Newtonsoft.Json;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Tiny;
 
 // internal classes that are decoded from JSON.
 namespace JsonDb
@@ -13,23 +13,17 @@ namespace JsonDb
         /// <summary>
         /// Deletes the whole data set.
         /// </summary>
-        Delete          = (1 << 0),
-
-        /// <summary>
-        /// Deletes a table.
-        /// </summary>
-        DeleteTable     = (1 << 1),
-
+        Delete      = (1 << 0),
 
         /// <summary>
         /// Inserts the data into a row.
         /// </summary>
-        Insert          = (1 << 2),
+        Insert      = (1 << 1),
 
         /// <summary>
         /// Changes a row.
         /// </summary>
-        Change          = (1 << 3),
+        Change      = (1 << 2),
     }
 
     public class ModificationQuery
@@ -39,7 +33,6 @@ namespace JsonDb
         public List<string> keys;
         public FindDataPredicate predicate;
         public List<object> data;
-        public List<List<object>> bulkData;
     }
 
     public enum ModificationFlags

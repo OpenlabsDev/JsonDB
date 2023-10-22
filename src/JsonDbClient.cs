@@ -1,15 +1,13 @@
-﻿#if DEBUG
-#define LOG_MESSAGES
-#endif
+﻿#define LOG_MESSAGES
 
 using JsonDb.Interfaces;
-using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Channels;
 using System.Threading.Tasks;
+using Tiny;
 
 namespace JsonDb
 {
@@ -63,21 +61,6 @@ namespace JsonDb
         public FindDataPredicate Predicate { get; }
 
         public Action<List<object>> OnSuccess { get; set; } = new(x => { });
-        public Action<string> OnError { get; set; } = new(err => { });
-    }
-
-    public class GetAllQueryArgs
-    {
-        public GetAllQueryArgs(string tableName, List<string> keys)
-        {
-            TableName = tableName;
-            Keys = keys;
-        }
-
-        public string TableName { get; }
-        public List<string> Keys { get; }
-
-        public Action<List<List<object>>> OnSuccess { get; set; } = new(x => { });
         public Action<string> OnError { get; set; } = new(err => { });
     }
 
@@ -136,7 +119,7 @@ namespace JsonDb
                     Console.WriteLine("INFO: adding " + args.TableName + " table to db");
 #endif
                     _client.File.SaveDb(_client.Database);
-                    if (args.OnSuccess != null) args.OnSuccess();
+                    args.OnSuccess();
                     return true;
                 }
 
@@ -144,12 +127,12 @@ namespace JsonDb
 #if LOG_MESSAGES
                 Console.WriteLine("WARNING: table " + args.TableName + " already exists in db");
 #endif
-                if (args.OnError != null) args.OnError("Table already exists");
+                args.OnError("Table already exists");
                 return false;
             }
             catch (Exception ex)
             {
-                if (args.OnError != null) args.OnError(ex.ToString());
+                args.OnError(ex.ToString());
                 return false;
             }
         }
@@ -167,7 +150,7 @@ namespace JsonDb
 
                 if (table == null || tableIdx <= -1)
                 {
-                    if (args.OnError != null) args.OnError("Table doesnt exist");
+                    args.OnError("Table doesnt exist");
                     return false;
                 }
 
@@ -175,12 +158,7 @@ namespace JsonDb
                 {
                     if (args.Query.data.Count != table.Keys.Count)
                         throw new Exception("Invalid query signature -- incorrect data given to an insert query.");
-
-                    if (args.Query.data != null)
-                        table.Rows.Add(args.Query.data);
-                    else if (args.Query.bulkData != null)
-                        foreach (var data in args.Query.bulkData)
-                            table.Rows.Add(data);
+                    table.Rows.Add(args.Query.data);
 
                     _client.Database.Tables[tableIdx] = table;
                     _client.File.SaveDb(_client.Database);
@@ -203,7 +181,7 @@ namespace JsonDb
                         for (int y = 0; y < table.Rows.Count; y++)
                         {
 #if LOG_MESSAGES
-                            Console.WriteLine("INFO: running predicate for  " + JsonConvert.SerializeObject(table.Rows[y]));
+                            Console.WriteLine("INFO: running predicate for  " + Json.Encode(table.Rows[y]));
 #endif
                             if (indexes.Contains(x) && args.Query.predicate(table.Rows[y]))
                             {
@@ -213,16 +191,9 @@ namespace JsonDb
                                 rowToDelete = y;
                             }
                         }
-
-                    if (rowToDelete > -1)
-                        table.Rows.RemoveAt(rowToDelete);
+                    table.Rows.RemoveAt(rowToDelete);
 
                     _client.Database.Tables[tableIdx] = table;
-                    _client.File.SaveDb(_client.Database);
-                }
-                else if (args.Query.type == ModificationQueryType.DeleteTable)
-                {
-                    _client.Database.Tables.RemoveAll(x => x.Name == args.Query.table);
                     _client.File.SaveDb(_client.Database);
                 }
                 else if (args.Query.type == ModificationQueryType.Change)
@@ -260,7 +231,7 @@ namespace JsonDb
                         for (int y = 0; y < table.Rows.Count; y++)
                         {
 #if LOG_MESSAGES
-                            Console.WriteLine("INFO: running predicate for  " + JsonConvert.SerializeObject(table.Rows[y]));
+                            Console.WriteLine("INFO: running predicate for  " + Json.Encode(table.Rows[y]));
 #endif
                             if (indexes.Any(o => o.keyIdx == x) && args.Query.predicate(table.Rows[y]))
                             {
@@ -280,7 +251,7 @@ namespace JsonDb
                     foreach (var change in pendingChanges)
                     {
 #if LOG_MESSAGES
-                        Console.WriteLine("INFO: changing " + JsonConvert.SerializeObject(table.Rows[change.Item2][change.Item1]) + " --> " + JsonConvert.SerializeObject(change.Item3));
+                        Console.WriteLine("INFO: changing " + Json.Encode(table.Rows[change.Item2][change.Item1]) + " --> " + Json.Encode(change.Item3));
 #endif
                         table.Rows[change.Item2][change.Item1] = change.Item3;
                     }
@@ -294,7 +265,7 @@ namespace JsonDb
             catch (Exception ex)
             {
                 Console.WriteLine(ex.ToString());
-                if (args.OnError != null) args.OnError(ex.Message);
+                args.OnError(ex.Message);
                 return false;
             }
             finally
@@ -316,119 +287,40 @@ namespace JsonDb
         /// <summary>
         /// Requests data from a row.
         /// </summary>
+        /// <param name="tableName">The name of the table.</param>
+        /// <param name="keys">The keys to include.</param>
+        /// <param name="predicate">The predicate to check if the the data is correct.</param>
+        /// <param name="data">The data returned by the operation.</param>
         public bool GetQuery(GetQueryArgs args, out List<object> data)
         {
             data = new List<object>();
 
+
 #if LOG_MESSAGES
             Console.WriteLine("INFO: getting data from the " + args.TableName + " table");
 #endif
-
-            bool foundTable = false;
             foreach (var table in _client.Database.Tables)
             {
-#if LOG_MESSAGES
-                Console.WriteLine("INFO: found " + table.Name + " table");
-#endif
                 List<int> indexes = new List<int>();
                 foreach (var key in table.Keys)
                     if (args.Keys.Contains(key))
-                    {
-                        var keyIdx = table.Keys.IndexOf(key);
-#if LOG_MESSAGES
-                        Console.WriteLine("WARNING: adding " + key + " to key list; keyIdx = " + keyIdx);
-#endif
                         indexes.Add(table.Keys.IndexOf(key));
-                    }
 
                 if (table.Name == args.TableName)
-                {
-#if LOG_MESSAGES
-                    Console.WriteLine("INFO: found " + table.Name + " table that was requested");
-#endif
                     foreach (var row in table.Rows)
                     {
-                        var rowIdx = table.Rows.IndexOf(row);
                         var requestedColumns = GetIncludedColumns(indexes, row);
                         if (args.Predicate(requestedColumns))
                         {
-#if LOG_MESSAGES
-                            Console.WriteLine("INFO: predicate success. took " + rowIdx + " row(s) to find target");
-#endif
-                            foundTable = true;
                             data = requestedColumns;
                             break;
                         }
                     }
-                }
             }
 
-            if (!foundTable)
-            {
 #if LOG_MESSAGES
-                Console.WriteLine("WARNING: table " + args.TableName + " was not found in db");
+            Console.WriteLine("INFO: finished get operation in the " + args.TableName + " table");
 #endif
-
-                if (args.OnError != null) args.OnError("No table found, or the table data query predicate failed.");
-            }
-            return true;
-        }
-
-        /// <summary>
-        /// Requests data from every row.
-        /// </summary>
-        public bool GetAllQuery(GetAllQueryArgs args, out List<List<object>> data)
-        {
-            data = new List<List<object>>();
-
-#if LOG_MESSAGES
-            Console.WriteLine("INFO: getting all data from the " + args.TableName + " table");
-#endif
-
-            bool foundTable = false;
-            foreach (var table in _client.Database.Tables)
-            {
-#if LOG_MESSAGES
-                Console.WriteLine("INFO: found " + table.Name + " table");
-#endif
-                List<int> indexes = new List<int>();
-                foreach (var key in table.Keys)
-                    if (args.Keys.Contains(key))
-                    {
-                        var keyIdx = table.Keys.IndexOf(key);
-#if LOG_MESSAGES
-                        Console.WriteLine("WARNING: adding " + key + " to key list; keyIdx = " + keyIdx);
-#endif
-                        indexes.Add(table.Keys.IndexOf(key));
-                    }
-
-                if (table.Name == args.TableName)
-                {
-#if LOG_MESSAGES
-                    Console.WriteLine("INFO: found " + table.Name + " table that was requested");
-#endif
-                    List<List<object>> result = new List<List<object>>();
-                    foreach (var row in table.Rows)
-                    {
-                        var rowIdx = table.Rows.IndexOf(row);
-                        var requestedColumns = GetIncludedColumns(indexes, row);
-
-                        foundTable = true;
-                        result.Add(requestedColumns);
-                    }
-                    data = result;
-                }
-            }
-
-            if (!foundTable)
-            {
-#if LOG_MESSAGES
-                Console.WriteLine("WARNING: table " + args.TableName + " was not found in db");
-#endif
-
-                if (args.OnError != null) args.OnError("No table found, or the table data query predicate failed.");
-                return false;
-            }
             return true;
         }
 
@@ -462,7 +354,6 @@ namespace JsonDb
                 Task.Factory.StartNew(async () => await InitTable_QueueProcessor(), TaskCreationOptions.LongRunning);
                 Task.Factory.StartNew(async () => await ModifyQuery_QueueProcessor(), TaskCreationOptions.LongRunning);
                 Task.Factory.StartNew(async () => await GetQuery_QueueProcessor(), TaskCreationOptions.LongRunning);
-                Task.Factory.StartNew(async () => await GetAllQuery_QueueProcessor(), TaskCreationOptions.LongRunning);
             }
         }
 
@@ -492,13 +383,12 @@ namespace JsonDb
                                 Rows = args.Rows
                             });
 
-
 #if LOG_MESSAGES
                             Console.WriteLine("INFO: adding " + args.TableName + " table to db");
 #endif
 
                             _file.SaveDb(_db);
-                            if (args.OnSuccess != null) args.OnSuccess();
+                            args.OnSuccess();
                         }
                         else
                         {
@@ -506,12 +396,12 @@ namespace JsonDb
                             Console.WriteLine("WARNING: table " + args.TableName + " already exists in db");
 #endif
 
-                            if (args.OnError != null) args.OnError("Table already exists");
+                            args.OnError("Table already exists");
                         }
                     }
                     catch (Exception ex)
                     {
-                        if (args.OnError != null) args.OnError(ex.Message);
+                        args.OnError(ex.Message);
                     }
                 }
 
@@ -534,7 +424,7 @@ namespace JsonDb
 
                         if (table == null || tableIdx <= -1)
                         {
-                            if (args.OnError != null) args.OnError("Table doesnt exist");
+                            args.OnError("Table doesnt exist");
                             return;
                         }
 
@@ -542,12 +432,7 @@ namespace JsonDb
                         {
                             if (args.Query.data.Count != table.Keys.Count)
                                 throw new Exception("Invalid query signature -- incorrect data given to an insert query.");
-
-                            if (args.Query.data != null)
-                                table.Rows.Add(args.Query.data);
-                            else if (args.Query.bulkData != null)
-                                foreach (var data in args.Query.bulkData)
-                                    table.Rows.Add(data);
+                            table.Rows.Add(args.Query.data);
 
                             _db.Tables[tableIdx] = table;
                             _file.SaveDb(_db);
@@ -570,7 +455,7 @@ namespace JsonDb
                                 for (int y = 0; y < table.Rows.Count; y++)
                                 {
 #if LOG_MESSAGES
-                            Console.WriteLine("INFO: running predicate for  " + JsonConvert.SerializeObject(table.Rows[y]));
+                            Console.WriteLine("INFO: running predicate for  " + Json.Encode(table.Rows[y]));
 #endif
                                     if (indexes.Contains(x) && args.Query.predicate(table.Rows[y]))
                                     {
@@ -580,16 +465,9 @@ namespace JsonDb
                                         rowToDelete = y;
                                     }
                                 }
-
-                            if (rowToDelete > -1)
-                                table.Rows.RemoveAt(rowToDelete);
+                            table.Rows.RemoveAt(rowToDelete);
 
                             _db.Tables[tableIdx] = table;
-                            _file.SaveDb(_db);
-                        }
-                        else if (args.Query.type == ModificationQueryType.DeleteTable)
-                        {
-                            _db.Tables.RemoveAll(x => x.Name == args.Query.table);
                             _file.SaveDb(_db);
                         }
                         else if (args.Query.type == ModificationQueryType.Change)
@@ -627,7 +505,7 @@ namespace JsonDb
                                 for (int y = 0; y < table.Rows.Count; y++)
                                 {
 #if LOG_MESSAGES
-                            Console.WriteLine("INFO: running predicate for  " + JsonConvert.SerializeObject(table.Rows[y]));
+                            Console.WriteLine("INFO: running predicate for  " + Json.Encode(table.Rows[y]));
 #endif
                                     if (indexes.Any(o => o.keyIdx == x) && args.Query.predicate(table.Rows[y]))
                                     {
@@ -647,7 +525,7 @@ namespace JsonDb
                             foreach (var change in pendingChanges)
                             {
 #if LOG_MESSAGES
-                        Console.WriteLine("INFO: changing " + JsonConvert.SerializeObject(table.Rows[change.Item2][change.Item1]) + " --> " + JsonConvert.SerializeObject(change.Item3));
+                        Console.WriteLine("INFO: changing " + Json.Encode(table.Rows[change.Item2][change.Item1]) + " --> " + Json.Encode(change.Item3));
 #endif
                                 table.Rows[change.Item2][change.Item1] = change.Item3;
                             }
@@ -656,12 +534,12 @@ namespace JsonDb
                             _file.SaveDb(_db);
                         }
 
-                        if (args.OnSuccess != null) args.OnSuccess();
+                        args.OnSuccess();
                     }
                     catch (Exception ex)
                     {
                         Console.WriteLine(ex.ToString());
-                        if (args.OnError != null) args.OnError(ex.Message);
+                        args.OnError(ex.Message);
                     }
                     finally
                     {
@@ -677,12 +555,10 @@ namespace JsonDb
         {
             for (; ; )
             {
-                await Task.Delay(100);
-
                 if (_getQueryQueue.Count > 0)
                 {
-                    await Task.Delay(25);
                     var args = _getQueryQueue.Dequeue();
+
 
 #if LOG_MESSAGES
                     Console.WriteLine("INFO: getting data from the " + args.TableName + " table");
@@ -690,9 +566,8 @@ namespace JsonDb
                     try
                     {
                         bool foundTable = false;
-                        for (int i = 0; i < _db.Tables.Count; i++)
+                        foreach (var table in _db.Tables)
                         {
-                            var table = _db.Tables[i];
 #if LOG_MESSAGES
                             Console.WriteLine("INFO: found " + table.Name + " table");
 #endif
@@ -722,7 +597,7 @@ namespace JsonDb
                                         Console.WriteLine("INFO: predicate success. took " + rowIdx + " row(s) to find target");
 #endif
                                         foundTable = true;
-                                        if (args.OnSuccess != null) args.OnSuccess(requestedColumns);
+                                        args.OnSuccess(requestedColumns);
                                         break;
                                     }
                                 }
@@ -735,7 +610,7 @@ namespace JsonDb
                             Console.WriteLine("WARNING: table " + args.TableName + " was not found in db");
 #endif
 
-                            if (args.OnError != null) args.OnError("No table found, or the table data query predicate failed.");
+                            args.OnError("No table found, or the table data query predicate failed.");
                         }
                     }
                     catch (Exception ex)
@@ -744,81 +619,7 @@ namespace JsonDb
                         Console.WriteLine("WARNING: " + ex.ToString());
 #endif
 
-                        if (args.OnError != null) args.OnError(ex.Message);
-                    }
-                }
-
-                await Task.Delay(25);
-            }
-        }
-
-        public async Task GetAllQuery_QueueProcessor()
-        {
-            for (; ; )
-            {
-                if (_getAllQueryQueue.Count > 0)
-                {
-                    var args = _getAllQueryQueue.Dequeue();
-
-
-#if LOG_MESSAGES
-                    Console.WriteLine("INFO: getting data from the " + args.TableName + " table");
-#endif
-                    try
-                    {
-                        bool foundTable = false;
-                        for (int i = 0; i < _db.Tables.Count; i++)
-                        {
-                            var table = _db.Tables[i];
-#if LOG_MESSAGES
-                            Console.WriteLine("INFO: found " + table.Name + " table");
-#endif
-                            List<int> indexes = new List<int>();
-                            foreach (var key in table.Keys)
-                                if (args.Keys.Contains(key))
-                                {
-                                    var keyIdx = table.Keys.IndexOf(key);
-#if LOG_MESSAGES
-                                    Console.WriteLine("WARNING: adding " + key + " to key list; keyIdx = " + keyIdx);
-#endif
-                                    indexes.Add(table.Keys.IndexOf(key));
-                                }
-
-                            if (table.Name == args.TableName)
-                            {
-#if LOG_MESSAGES
-                                Console.WriteLine("INFO: found " + table.Name + " table that was requested");
-#endif
-
-                                foundTable = true;
-                                List<List<object>> result = new List<List<object>>();
-                                foreach (var row in table.Rows)
-                                {
-                                    var rowIdx = table.Rows.IndexOf(row);
-                                    var requestedColumns = GetIncludedColumns(indexes, row);
-
-                                    result.Add(requestedColumns);
-                                }
-                                if (args.OnSuccess != null) args.OnSuccess(result);
-                            }
-                        }
-
-                        if (!foundTable)
-                        {
-#if LOG_MESSAGES
-                            Console.WriteLine("WARNING: table " + args.TableName + " was not found in db");
-#endif
-
-                            if (args.OnError != null) args.OnError("No table found, or the table data query predicate failed.");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-#if LOG_MESSAGES
-                        Console.WriteLine("WARNING: " + ex.ToString());
-#endif
-
-                        if (args.OnError != null) args.OnError(ex.Message);
+                        args.OnError(ex.Message);
                     }
                 }
 
@@ -847,8 +648,8 @@ namespace JsonDb
         /// <param name="rows">The data to initialize the table with.</param>
         public void InitTable(InitTableArgs args, Action onSuccess = null!, Action<string> onError = null!)
         {
-            if (args.OnSuccess != null) args.OnSuccess = onSuccess;
-            if (args.OnError != null) args.OnError = onError;
+            args.OnSuccess = onSuccess;
+            args.OnError = onError;
 
             _initTableQueue.Enqueue(args);
         }
@@ -859,8 +660,8 @@ namespace JsonDb
         /// <param name="query">The query to execute.</param>
         public void ModifyQuery(ModifyQueryArgs args, Action onSuccess = null!, Action<string> onError = null!)
         {
-            if (args.OnSuccess != null) args.OnSuccess = onSuccess;
-            if (args.OnError != null) args.OnError = onError;
+            args.OnSuccess = onSuccess;
+            args.OnError = onError;
 
             _modifyQueryQueue.Enqueue(args);
         }
@@ -870,7 +671,7 @@ namespace JsonDb
             List<object> result = new List<object>();
             for (int i = 0; i < requestedIndexes.Count; i++)
                 for (int j = 0; j < allValues.Count; j++)
-                    if (requestedIndexes.Contains(j))
+                    if (requestedIndexes.Contains(i) && requestedIndexes.Contains(j))
                         result.Add(allValues[j]);
             return result;
         }
@@ -878,23 +679,16 @@ namespace JsonDb
         /// <summary>
         /// Requests data from a row.
         /// </summary>
+        /// <param name="tableName">The name of the table.</param>
+        /// <param name="keys">The keys to include.</param>
+        /// <param name="predicate">The predicate to check if the the data is correct.</param>
+        /// <param name="data">The data returned by the operation.</param>
         public void GetQuery(GetQueryArgs args, Action<List<object>> onSuccess = null!, Action<string> onError = null!)
         {
-            if (args.OnSuccess != null) args.OnSuccess = onSuccess;
-            if (args.OnError != null) args.OnError = onError;
+            args.OnSuccess = onSuccess;
+            args.OnError = onError;
 
             _getQueryQueue.Enqueue(args);
-        }
-
-        /// <summary>
-        /// Requests data from every row.
-        /// </summary>
-        public void GetAllQuery(GetAllQueryArgs args, Action<List<List<object>>> onSuccess = null!, Action<string> onError = null!)
-        {
-            if (args.OnSuccess != null) args.OnSuccess = onSuccess;
-            if (args.OnError != null) args.OnError = onError;
-
-            _getAllQueryQueue.Enqueue(args);
         }
 
         /// <inheritdoc/>
@@ -924,7 +718,6 @@ namespace JsonDb
         private Queue<InitTableArgs> _initTableQueue = new Queue<InitTableArgs>();
         private Queue<ModifyQueryArgs> _modifyQueryQueue = new Queue<ModifyQueryArgs>();
         private Queue<GetQueryArgs> _getQueryQueue = new Queue<GetQueryArgs>();
-        private Queue<GetAllQueryArgs> _getAllQueryQueue = new Queue<GetAllQueryArgs>();
 
         private List<JsonDbClientSession> _allSessions = new List<JsonDbClientSession>();
     }
