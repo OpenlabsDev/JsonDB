@@ -1,4 +1,6 @@
-﻿#define LOG_MESSAGES
+﻿#if DEBUG
+#define LOG_MESSAGES
+#endif
 
 using JsonDb.Interfaces;
 using System;
@@ -61,6 +63,23 @@ namespace JsonDb
         public FindDataPredicate Predicate { get; }
 
         public Action<List<object>> OnSuccess { get; set; } = new(x => { });
+        public Action<string> OnError { get; set; } = new(err => { });
+    }
+
+
+    public class GetAllQueryArgs
+    {
+        public GetAllQueryArgs(string tableName, List<string> keys)
+        {
+            this.TableName = tableName;
+            this.Keys = keys;
+        }
+
+        public string TableName { get; }
+
+        public List<string> Keys { get; }
+
+        public Action<List<List<object>>> OnSuccess { get; set; } = new(list => { });
         public Action<string> OnError { get; set; } = new(err => { });
     }
 
@@ -299,8 +318,9 @@ namespace JsonDb
 #if LOG_MESSAGES
             Console.WriteLine("INFO: getting data from the " + args.TableName + " table");
 #endif
-            foreach (var table in _client.Database.Tables)
+            for (int i = 0; i < _client.Database.Tables.Count; i++)
             {
+                var table = _client.Database.Tables[i];
                 List<int> indexes = new List<int>();
                 foreach (var key in table.Keys)
                     if (args.Keys.Contains(key))
@@ -317,6 +337,54 @@ namespace JsonDb
                         }
                     }
             }
+
+#if LOG_MESSAGES
+            Console.WriteLine("INFO: finished get operation in the " + args.TableName + " table");
+#endif
+            return true;
+        }
+
+        /// <summary>
+        /// Requests all data from a row.
+        /// </summary>
+        public bool GetAllQuery(GetQueryArgs args, out List<List<object>> data)
+        {
+            data = new List<List<object>>();
+
+            bool foundTable = false;
+#if LOG_MESSAGES
+            Console.WriteLine("INFO: getting data from the " + args.TableName + " table");
+#endif
+            for (int i = 0; i < _client.Database.Tables.Count; i++)
+            {
+                var table = _client.Database.Tables[i];
+                List<int> indexes = new List<int>();
+                foreach (var key in table.Keys)
+                    if (args.Keys.Contains(key))
+                        indexes.Add(table.Keys.IndexOf(key));
+
+                if (table.Name == args.TableName)
+                {
+                    foundTable = true;
+                    foreach (var row in table.Rows)
+                    {
+                        var requestedColumns = GetIncludedColumns(indexes, row);
+                        if (args.Predicate(requestedColumns))
+                        {
+                            data.Add(requestedColumns);
+                        }
+                    }
+                }
+            }
+            
+            if (!foundTable)
+            {
+#if LOG_MESSAGES
+                Console.WriteLine("WARNING: cannot find the " + args.TableName + " table");
+#endif
+                return false;
+            }
+
 
 #if LOG_MESSAGES
             Console.WriteLine("INFO: finished get operation in the " + args.TableName + " table");
@@ -354,6 +422,7 @@ namespace JsonDb
                 Task.Factory.StartNew(async () => await InitTable_QueueProcessor(), TaskCreationOptions.LongRunning);
                 Task.Factory.StartNew(async () => await ModifyQuery_QueueProcessor(), TaskCreationOptions.LongRunning);
                 Task.Factory.StartNew(async () => await GetQuery_QueueProcessor(), TaskCreationOptions.LongRunning);
+                Task.Factory.StartNew(async () => await GetAllQuery_QueueProcessor(), TaskCreationOptions.LongRunning);
             }
         }
 
@@ -566,8 +635,9 @@ namespace JsonDb
                     try
                     {
                         bool foundTable = false;
-                        foreach (var table in _db.Tables)
+                        for (int i = 0; i < _db.Tables.Count; i++)
                         {
+                            var table = _db.Tables[i];
 #if LOG_MESSAGES
                             Console.WriteLine("INFO: found " + table.Name + " table");
 #endif
@@ -620,6 +690,58 @@ namespace JsonDb
 #endif
 
                         args.OnError(ex.Message);
+                    }
+                }
+
+                await Task.Delay(25);
+            }
+        }
+
+        public async Task GetAllQuery_QueueProcessor()
+        {
+            for (; ; )
+            {
+                if (_getAllQueryQueue.Count > 0)
+                {
+                    var args = _getAllQueryQueue.Dequeue();
+
+                    var data = new List<List<object>>();
+                    bool foundTable = false;
+#if LOG_MESSAGES
+                    Console.WriteLine("INFO: getting data from the " + args.TableName + " table");
+#endif
+                    for (int i = 0; i < _db.Tables.Count; i++)
+                    {
+                        var table = _db.Tables[i];
+                        List<int> indexes = new List<int>();
+                        foreach (var key in table.Keys)
+                            if (args.Keys.Contains(key))
+                                indexes.Add(table.Keys.IndexOf(key));
+
+                        if (table.Name == args.TableName)
+                        {
+                            foundTable = true;
+                            foreach (var row in table.Rows)
+                            {
+                                var requestedColumns = GetIncludedColumns(indexes, row);
+                                data.Add(requestedColumns);
+                            }
+                        }
+                    }
+
+                    if (!foundTable)
+                    {
+#if LOG_MESSAGES
+                        Console.WriteLine("WARNING: cannot find the " + args.TableName + " table");
+#endif
+                        args.OnError("No table was found");
+                    }
+                    else
+                    {
+#if LOG_MESSAGES
+                        Console.WriteLine("INFO: finished get operation in the " + args.TableName + " table");
+#endif
+                        args.OnSuccess(data);
                     }
                 }
 
@@ -691,6 +813,15 @@ namespace JsonDb
             _getQueryQueue.Enqueue(args);
         }
 
+        public void GetAllQuery(GetAllQueryArgs args, Action<List<List<object>>> onSuccess = null, Action<string> onError = null)
+        {
+            args.OnSuccess = onSuccess;
+            args.OnError = onError;
+
+            this._getAllQueryQueue.Enqueue(args);
+        }
+
+
         /// <inheritdoc/>
         public void Close(JsonDbClientSession session) 
         {
@@ -718,6 +849,7 @@ namespace JsonDb
         private Queue<InitTableArgs> _initTableQueue = new Queue<InitTableArgs>();
         private Queue<ModifyQueryArgs> _modifyQueryQueue = new Queue<ModifyQueryArgs>();
         private Queue<GetQueryArgs> _getQueryQueue = new Queue<GetQueryArgs>();
+        private Queue<GetAllQueryArgs> _getAllQueryQueue = new Queue<GetAllQueryArgs>();
 
         private List<JsonDbClientSession> _allSessions = new List<JsonDbClientSession>();
     }
