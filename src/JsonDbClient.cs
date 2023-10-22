@@ -3,13 +3,13 @@
 #endif
 
 using JsonDb.Interfaces;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Channels;
 using System.Threading.Tasks;
-using Tiny;
 
 namespace JsonDb
 {
@@ -200,7 +200,7 @@ namespace JsonDb
                         for (int y = 0; y < table.Rows.Count; y++)
                         {
 #if LOG_MESSAGES
-                            Console.WriteLine("INFO: running predicate for  " + Json.Encode(table.Rows[y]));
+                            Console.WriteLine("INFO: running predicate for  " + JsonConvert.SerializeObject(table.Rows[y]));
 #endif
                             if (indexes.Contains(x) && args.Query.predicate(table.Rows[y]))
                             {
@@ -250,7 +250,7 @@ namespace JsonDb
                         for (int y = 0; y < table.Rows.Count; y++)
                         {
 #if LOG_MESSAGES
-                            Console.WriteLine("INFO: running predicate for  " + Json.Encode(table.Rows[y]));
+                            Console.WriteLine("INFO: running predicate for  " + JsonConvert.SerializeObject(table.Rows[y]));
 #endif
                             if (indexes.Any(o => o.keyIdx == x) && args.Query.predicate(table.Rows[y]))
                             {
@@ -270,7 +270,7 @@ namespace JsonDb
                     foreach (var change in pendingChanges)
                     {
 #if LOG_MESSAGES
-                        Console.WriteLine("INFO: changing " + Json.Encode(table.Rows[change.Item2][change.Item1]) + " --> " + Json.Encode(change.Item3));
+                        Console.WriteLine("INFO: changing " + JsonConvert.SerializeObject(table.Rows[change.Item2][change.Item1]) + " --> " + JsonConvert.SerializeObject(change.Item3));
 #endif
                         table.Rows[change.Item2][change.Item1] = change.Item3;
                     }
@@ -524,7 +524,7 @@ namespace JsonDb
                                 for (int y = 0; y < table.Rows.Count; y++)
                                 {
 #if LOG_MESSAGES
-                            Console.WriteLine("INFO: running predicate for  " + Json.Encode(table.Rows[y]));
+                            Console.WriteLine("INFO: running predicate for  " + JsonConvert.SerializeObject(table.Rows[y]));
 #endif
                                     if (indexes.Contains(x) && args.Query.predicate(table.Rows[y]))
                                     {
@@ -574,7 +574,7 @@ namespace JsonDb
                                 for (int y = 0; y < table.Rows.Count; y++)
                                 {
 #if LOG_MESSAGES
-                            Console.WriteLine("INFO: running predicate for  " + Json.Encode(table.Rows[y]));
+                            Console.WriteLine("INFO: running predicate for  " + JsonConvert.SerializeObject(table.Rows[y]));
 #endif
                                     if (indexes.Any(o => o.keyIdx == x) && args.Query.predicate(table.Rows[y]))
                                     {
@@ -594,7 +594,7 @@ namespace JsonDb
                             foreach (var change in pendingChanges)
                             {
 #if LOG_MESSAGES
-                        Console.WriteLine("INFO: changing " + Json.Encode(table.Rows[change.Item2][change.Item1]) + " --> " + Json.Encode(change.Item3));
+                        Console.WriteLine("INFO: changing " + JsonConvert.SerializeObject(table.Rows[change.Item2][change.Item1]) + " --> " + JsonConvert.SerializeObject(change.Item3));
 #endif
                                 table.Rows[change.Item2][change.Item1] = change.Item3;
                             }
@@ -813,6 +813,9 @@ namespace JsonDb
             _getQueryQueue.Enqueue(args);
         }
 
+        /// <summary>
+        /// Requests all data from a row.
+        /// </summary>
         public void GetAllQuery(GetAllQueryArgs args, Action<List<List<object>>> onSuccess = null, Action<string> onError = null)
         {
             args.OnSuccess = onSuccess;

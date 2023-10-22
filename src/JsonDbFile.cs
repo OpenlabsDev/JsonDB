@@ -1,11 +1,11 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
-using Tiny;
 
 namespace JsonDb
 {
@@ -53,14 +53,14 @@ namespace JsonDb
             var contents = Encoding.UTF8.GetString(
                 Convert.FromBase64String(File.ReadAllText(Path))
             );
-            return Tiny.Json.Decode<JsonDatabase>(contents);
+            return JsonConvert.DeserializeObject<JsonDatabase>(contents);
         }
 
         internal void SaveDb(JsonDatabase database)
         {
             if (!Open) return;
 
-            var contents = Encoding.UTF8.GetBytes(Tiny.Json.Encode(database));
+            var contents = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(database));
             File.WriteAllText(Path, Convert.ToBase64String(contents));
         } 
 
